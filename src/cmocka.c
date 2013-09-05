@@ -93,6 +93,9 @@ WINBASEAPI BOOL WINAPI IsDebuggerPresent(VOID);
     pointer_type, largest_integral_type) \
     ((pointer_type)((ValuePointer*)&(largest_integral_type))->x.pointer)
 
+/* Output XML file pointer */
+FILE *xml_output;
+
 /* Used to cast LargetIntegralType to void* and vice versa. */
 typedef union ValuePointer {
     LargestIntegralType value;
@@ -1660,6 +1663,14 @@ void vprint_message(const char* const format, va_list args) {
 void vprint_error(const char* const format, va_list args) {
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
+
+   /* Output error to xml file, filter out non-information */
+   if(buffer[0] != '[') {
+       if(strncmp(buffer, "ERROR:", 6)) {
+           fprintf(xml_output, "\t\t<error>\n\t\t%s\t\t</error>\n", buffer);
+       }
+   }
+
     fprintf(stderr, "%s", buffer);
     fflush(stderr);
 #ifdef _WIN32
@@ -1714,6 +1725,9 @@ int _run_test(
 #endif /* !_WIN32 */
     }
 
+   /* Output testcase to xml file */
+   fprintf(xml_output, "\t<testcase name=\"%s\">\n", function_name);
+
     if (function_type == UNIT_TEST_FUNCTION_TYPE_TEST) {
         print_message("[ RUN      ] %s\n", function_name);
     }
@@ -1755,6 +1769,8 @@ int _run_test(
 #endif /* !_WIN32 */
     }
 
+   /* Output end of testcase to xml file */
+   fprintf(xml_output, "\t</testcase>\n");
     return rc;
 }
 
@@ -1787,6 +1803,11 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
     const char** failed_names = (const char**)malloc(number_of_tests *
                                        sizeof(*failed_names));
     void **current_state = NULL;
+
+   /* Open the XML for writing and write the JUnit compatible header */
+   xml_output = fopen("results.xml", "w");
+   fprintf(xml_output, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+   fprintf(xml_output, "<testsuite tests=\"%d\">\n", number_of_tests);
 
     print_message("[==========] Running %"PRIdS " test(s).\n", number_of_tests);
 
@@ -1888,6 +1909,10 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
                     "teardown %"PRIdS " functions\n", setups, teardowns);
         total_failed = (size_t)-1;
     }
+
+   /* Close the output XML file */
+   fprintf(xml_output, "</testsuite>\n");
+   fclose(xml_output);
 
     free(test_states);
     free((void*)failed_names);
