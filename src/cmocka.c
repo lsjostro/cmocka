@@ -27,6 +27,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1774,6 +1777,13 @@ int _run_test(
     return rc;
 }
 
+static char *sTimeFilename ( void ) {
+    static char s_file[255];
+    time_t      now;
+    time(&now);
+    sprintf(s_file, "result_%d_%d.xml", now, getpid());
+    return(s_file);
+}
 
 int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
     /* Whether to execute the next test. */
@@ -1805,7 +1815,7 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
     void **current_state = NULL;
 
    /* Open the XML for writing and write the JUnit compatible header */
-   xml_output = fopen("results.xml", "w");
+   xml_output = fopen(sTimeFilename(), "w");
    fprintf(xml_output, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
    fprintf(xml_output, "<testsuite tests=\"%d\">\n", number_of_tests);
 
