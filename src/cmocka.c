@@ -27,9 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <sys/prctl.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1772,17 +1770,9 @@ int _run_test(
 #endif /* !_WIN32 */
     }
 
-   /* Output end of testcase to xml file */
-   fprintf(xml_output, "\t</testcase>\n");
+    /* Output end of testcase to xml file */
+    fprintf(xml_output, "\t</testcase>\n");
     return rc;
-}
-
-static char *sTimeFilename ( void ) {
-    static char s_file[255];
-    time_t      now;
-    time(&now);
-    sprintf(s_file, "result_%d_%d.xml", now, getpid());
-    return(s_file);
 }
 
 int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
@@ -1814,10 +1804,14 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
                                        sizeof(*failed_names));
     void **current_state = NULL;
 
-   /* Open the XML for writing and write the JUnit compatible header */
-   xml_output = fopen(sTimeFilename(), "w");
-   fprintf(xml_output, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-   fprintf(xml_output, "<testsuite tests=\"%d\">\n", number_of_tests);
+    /* Open the XML for writing and write the JUnit compatible header */
+    static char proc_name[255];
+    static char s_file[255];
+    prctl(PR_GET_NAME, proc_name, 0, 0, 0);
+    sprintf(s_file, "%s_result.xml", proc_name);
+    xml_output = fopen(s_file, "w");
+    fprintf(xml_output, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    fprintf(xml_output, "<testsuite tests=\"%d\" name=\"%s\">\n", number_of_tests, proc_name);
 
     print_message("[==========] Running %"PRIdS " test(s).\n", number_of_tests);
 
@@ -1901,6 +1895,10 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
         }
     }
 
+    /* Close the output XML file */
+    fprintf(xml_output, "</testsuite>\n");
+    fclose(xml_output);
+
     print_message("[==========] %"PRIdS " test(s) run.\n", tests_executed);
     print_error("[  PASSED  ] %"PRIdS " test(s).\n", tests_executed - total_failed);
 
@@ -1919,10 +1917,6 @@ int _run_tests(const UnitTest * const tests, const size_t number_of_tests) {
                     "teardown %"PRIdS " functions\n", setups, teardowns);
         total_failed = (size_t)-1;
     }
-
-   /* Close the output XML file */
-   fprintf(xml_output, "</testsuite>\n");
-   fclose(xml_output);
 
     free(test_states);
     free((void*)failed_names);
